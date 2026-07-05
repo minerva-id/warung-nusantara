@@ -3,102 +3,212 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin Katalog — Warung Nusantara</title>
+<title>Admin Panel — Warung Nusantara</title>
+<meta name="robots" content="noindex,nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/admin.css">
+<!-- Supabase JS Client (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 
-<!-- ============ GERBANG KATA SANDI (proteksi ringan, lihat DOCUMENTATION.md) ============ -->
+<!-- ============ GERBANG SUPABASE AUTH (mode default jika Supabase dikonfigurasi) ============ -->
+<div class="lock-screen hidden" id="supabaseLockScreen">
+  <div class="icon">🔐</div>
+  <h2>Masuk Admin</h2>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Login dengan akun admin Supabase yang sudah dibuat.</p>
+  <div class="field" style="width:100%;max-width:360px;">
+    <label for="supabaseEmail">Email Admin</label>
+    <input type="email" id="supabaseEmail" placeholder="admin@warung.com" autocomplete="email">
+  </div>
+  <div class="field" style="width:100%;max-width:360px;margin-top:10px;">
+    <label for="supabasePassword">Kata Sandi</label>
+    <input type="password" id="supabasePassword" placeholder="Masukkan kata sandi" autocomplete="current-password">
+  </div>
+  <p id="loginError" style="color:#ef4444;font-size:12.5px;margin:8px 0;min-height:18px;"></p>
+  <button class="btn-solid" style="width:100%;max-width:360px;" id="btnSupabaseLogin">Masuk</button>
+  <p class="lock-note" style="margin-top:16px;">🔒 Login aman menggunakan Supabase Auth (JWT, password di-hash). Password tidak tersimpan di kode sumber.</p>
+</div>
+
+<!-- ============ GERBANG KATA SANDI LAMA (fallback jika Supabase belum dikonfigurasi) ============ -->
 <div class="lock-screen" id="lockScreen">
   <div class="icon">🔐</div>
   <h2>Masuk Admin</h2>
-  <p style="font-size:13px;color:var(--muted);">Halaman ini untuk mengelola katalog produk &amp; harga.</p>
+  <p style="font-size:13px;color:var(--muted);">Halaman ini untuk mengelola katalog produk & harga.</p>
   <input type="password" id="lockPassword" placeholder="Masukkan kata sandi admin">
   <button class="btn-solid" style="width:100%;" id="btnUnlock">Masuk</button>
-  <p class="lock-note">⚠️ Ini hanya proteksi ringan di sisi browser, bukan keamanan sungguhan. Jangan gunakan kata sandi penting, dan baca DOCUMENTATION.md bagian "Batasan Teknis" sebelum go-live.</p>
+  <p class="lock-note">⚠️ Mode Lokal: Supabase belum dikonfigurasi. Ini hanya proteksi ringan di sisi browser. Baca DOCUMENTATION.md sebelum go-live.</p>
 </div>
 
 <!-- ============ HALAMAN ADMIN ============ -->
 <div class="admin-stage hidden" id="adminStage">
+
+  <!-- Header Admin -->
   <div class="admin-header">
-    <h1>🧾 Admin Katalog</h1>
-    <a href="index.html">← Kembali ke Toko</a>
-  </div>
-
-  <div class="admin-card">
-    <h2>1. Muat Data Produk</h2>
-    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
-      Muat otomatis dari <code>data/products.json</code>, atau impor file JSON hasil unduhan sebelumnya.
-    </p>
-    <div class="admin-actions">
-      <button class="btn-outline" id="btnLoadDefault">Muat dari data/products.json</button>
-      <button class="btn-outline" id="btnImportFile">Impor File JSON</button>
-      <input type="file" id="fileInput" accept="application/json" class="hidden">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <h1>🧾 Admin Panel</h1>
+      <span style="font-size:12px;color:var(--muted);" id="adminUserEmail"></span>
     </div>
-    <div class="status-line" id="loadStatus"></div>
-  </div>
-
-  <div class="admin-card">
-    <h2>2. Tambah Produk Baru</h2>
-    <form id="addForm" class="grid-form">
-      <div class="field"><label>Nama Produk</label><input type="text" id="fNama" required></div>
-      <div class="field">
-        <label>Kategori</label>
-        <select id="fKategori" required>
-          <option value="mie-instan">Mie Instan</option>
-          <option value="bumbu-dapur">Bumbu Dapur</option>
-          <option value="sembako">Sembako</option>
-          <option value="snack">Snack</option>
-          <option value="minuman">Minuman</option>
-          <option value="bahan-segar">Bahan Segar</option>
-        </select>
-      </div>
-      <div class="field"><label>Harga (¥)</label><input type="number" id="fHarga" min="0" required></div>
-      <div class="field"><label>Satuan</label><input type="text" id="fSatuan" placeholder="Contoh: pak isi 5" required></div>
-      <div class="field"><label>Stok</label><input type="number" id="fStok" min="0" required></div>
-      <div class="field"><label>Emoji Ikon</label><input type="text" id="fEmoji" placeholder="🍜" maxlength="4"></div>
-      <div class="field full"><label>Deskripsi</label><input type="text" id="fDeskripsi" placeholder="Deskripsi singkat produk"></div>
-      <div class="field"><label>Tag (pisahkan koma)</label><input type="text" id="fTag" placeholder="halal, pedas, favorit"></div>
-      <div class="field" style="display:flex;align-items:center;gap:8px;margin-top:22px;">
-        <input type="checkbox" id="fUnggulan" style="width:auto;"> <label style="margin:0;" for="fUnggulan">Tandai sebagai produk favorit</label>
-      </div>
-      <div class="full">
-        <button type="submit" class="btn-solid">+ Tambah ke Tabel</button>
-      </div>
-    </form>
-  </div>
-
-  <div class="admin-card">
-    <h2>3. Daftar Produk &amp; Atur Harga</h2>
-    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
-      Ubah langsung nilai di tabel (nama, harga, stok, dst). Perubahan tersimpan otomatis ke memori — jangan lupa unduh file di langkah 4.
-    </p>
-    <div class="table-wrap">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Nama</th><th>Kategori</th><th>Harga (¥)</th><th>Satuan</th><th>Stok</th><th>Emoji</th><th></th>
-          </tr>
-        </thead>
-        <tbody id="productTableBody"></tbody>
-      </table>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <a href="index.html" style="font-size:13px;color:var(--muted);text-decoration:none;">← Toko</a>
+      <button class="btn-outline" id="btnLogout" style="font-size:13px;padding:6px 12px;">Keluar</button>
     </div>
   </div>
 
-  <div class="admin-card">
-    <h2>4. Simpan Perubahan</h2>
-    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
-      Unduh file <code>products.json</code> yang sudah diperbarui, lalu ganti file lama di folder <code>data/</code> pada repository GitHub (lihat DOCUMENTATION.md langkah "Menambah &amp; Mengubah Produk").
-    </p>
-    <div class="admin-actions">
-      <button class="btn-outline green" id="btnDownload">⬇ Unduh products.json</button>
+  <!-- Status bar global -->
+  <div class="status-line" id="loadStatus"></div>
+
+  <!-- Tab Navigation -->
+  <nav class="admin-tabs">
+    <button class="admin-tab-btn active" data-tab="products">🏷️ Produk</button>
+    <button class="admin-tab-btn" data-tab="orders">📦 Pesanan</button>
+    <button class="admin-tab-btn" data-tab="payments">💳 Konfirmasi Bayar</button>
+    <button class="admin-tab-btn" data-tab="requests">📝 Request Barang</button>
+    <button class="admin-tab-btn" data-tab="settings">⚙️ Pengaturan</button>
+  </nav>
+
+  <!-- ============ TAB: PRODUK ============ -->
+  <div class="admin-tab-panel" id="tab-products">
+
+    <!-- Load legacy (hanya tampil jika Supabase belum dikonfigurasi) -->
+    <div class="admin-card hidden" id="legacyLoadSection">
+      <h2>1. Muat Data Produk (Mode Lokal)</h2>
+      <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+        Mode lokal: muat dari <code>data/products.json</code>, atau impor file JSON.
+      </p>
+      <div class="admin-actions">
+        <button class="btn-outline" id="btnLoadDefault">Muat dari data/products.json</button>
+        <button class="btn-outline" id="btnImportFile">Impor File JSON</button>
+        <input type="file" id="fileInput" accept="application/json" class="hidden">
+      </div>
+    </div>
+
+    <!-- Tambah produk baru -->
+    <div class="admin-card">
+      <h2>➕ Tambah Produk Baru</h2>
+      <form id="addForm" class="grid-form">
+        <div class="field"><label>Nama Produk <span style="color:#ef4444">*</span></label><input type="text" id="fNama" required placeholder="Nama produk"></div>
+        <div class="field">
+          <label>Kategori <span style="color:#ef4444">*</span></label>
+          <select id="fKategori" required>
+            <option value="mie-instan">Mie Instan</option>
+            <option value="bumbu-dapur">Bumbu Dapur</option>
+            <option value="sembako">Sembako</option>
+            <option value="snack">Snack</option>
+            <option value="minuman">Minuman</option>
+            <option value="bahan-segar">Bahan Segar</option>
+          </select>
+        </div>
+        <div class="field"><label>Harga (¥) <span style="color:#ef4444">*</span></label><input type="number" id="fHarga" min="0" required placeholder="480"></div>
+        <div class="field"><label>Satuan <span style="color:#ef4444">*</span></label><input type="text" id="fSatuan" placeholder="pak isi 5" required></div>
+        <div class="field"><label>Stok <span style="color:#ef4444">*</span></label><input type="number" id="fStok" min="0" required placeholder="20"></div>
+        <div class="field"><label>Emoji Ikon</label><input type="text" id="fEmoji" placeholder="🍜" maxlength="4"></div>
+        <div class="field full"><label>Deskripsi</label><input type="text" id="fDeskripsi" placeholder="Deskripsi singkat produk"></div>
+        <div class="field"><label>Tag (pisahkan koma)</label><input type="text" id="fTag" placeholder="halal, pedas, favorit"></div>
+        <div class="field" style="display:flex;align-items:center;gap:8px;margin-top:22px;">
+          <input type="checkbox" id="fUnggulan" style="width:auto;"> <label style="margin:0;" for="fUnggulan">Tandai sebagai produk favorit</label>
+        </div>
+        <div class="full">
+          <button type="submit" class="btn-solid">+ Tambah ke Database</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Daftar produk -->
+    <div class="admin-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h2 style="margin:0;">📋 Daftar Produk</h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-outline" onclick="loadAdminProducts()" style="font-size:12px;padding:6px 10px;">🔄 Refresh</button>
+          <button class="btn-outline green" id="btnDownload" style="font-size:12px;padding:6px 10px;">⬇ Unduh JSON</button>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+        Mode Supabase: klik 💾 di tiap baris untuk menyimpan perubahan. Mode lokal: klik "Unduh JSON" lalu unggah ke GitHub.
+      </p>
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Kategori</th>
+              <th>Harga (¥)</th>
+              <th>Satuan</th>
+              <th>Stok</th>
+              <th>Emoji</th>
+              <th>Favorit</th>
+              <th>Aktif</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="productTableBody">
+            <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">Memuat produk...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
+
+  <!-- ============ TAB: PESANAN ============ -->
+  <div class="admin-tab-panel hidden" id="tab-orders">
+    <div class="admin-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h2 style="margin:0;">📦 Daftar Pesanan</h2>
+        <button class="btn-outline" onclick="loadAdminOrders()" style="font-size:12px;padding:6px 10px;">🔄 Refresh</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+        Ubah status pesanan dengan memilih dari dropdown lalu klik Simpan.
+      </p>
+      <div id="ordersContent">
+        <p class="status-msg info">Klik tab Pesanan untuk memuat data.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: KONFIRMASI BAYAR ============ -->
+  <div class="admin-tab-panel hidden" id="tab-payments">
+    <div class="admin-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h2 style="margin:0;">💳 Konfirmasi Pembayaran</h2>
+        <button class="btn-outline" onclick="loadAdminPayments()" style="font-size:12px;padding:6px 10px;">🔄 Refresh</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+        Verifikasi atau tolak bukti pembayaran yang dikirim customer. Klik "📷 Lihat" untuk melihat foto bukti.
+      </p>
+      <div id="paymentsContent">
+        <p class="status-msg info">Klik tab Konfirmasi Bayar untuk memuat data.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: REQUEST BARANG ============ -->
+  <div class="admin-tab-panel hidden" id="tab-requests">
+    <div class="admin-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h2 style="margin:0;">📝 Request Barang Khusus</h2>
+        <button class="btn-outline" onclick="loadAdminRequests()" style="font-size:12px;padding:6px 10px;">🔄 Refresh</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+        Daftar permintaan barang khusus dari customer. Ubah status dan follow up via WhatsApp.
+      </p>
+      <div id="requestsContent">
+        <p class="status-msg info">Klik tab Request Barang untuk memuat data.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: PENGATURAN ============ -->
+  <div class="admin-tab-panel hidden" id="tab-settings">
+    <div id="settingsContent">
+      <p class="status-msg info">Klik tab Pengaturan untuk memuat data.</p>
+    </div>
+  </div>
+
 </div>
 
+<script src="js/supabase-config.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

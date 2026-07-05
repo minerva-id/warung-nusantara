@@ -1,8 +1,12 @@
 /* =========================================================
-   WARUNG NUSANTARA — MAIN.JS
-   Semua logika toko: katalog, keranjang, request barang,
-   dan chatbot FAQ sederhana. Tidak ada backend — checkout
-   & request dikirim sebagai pesan WhatsApp ke admin.
+   WARUNG NUSANTARA — MAIN.JS (Versi Supabase)
+   
+   Perubahan dari versi statis:
+   - Produk dimuat dari Supabase database (bukan file JSON)
+   - Request barang khusus tersimpan ke database
+   - Keranjang masih localStorage (UX cepat, sinkron ke DB saat checkout)
+   - Checkout membuat record order di database lalu buka WhatsApp
+   - Fallback ke products.json jika Supabase belum dikonfigurasi
    ========================================================= */
 
 /* =====================================================
@@ -10,14 +14,15 @@
    ===================================================== */
 const CONFIG = {
   // Nomor WhatsApp admin, format internasional TANPA tanda "+" dan TANPA angka 0 di depan.
-  // Contoh nomor Jepang 090-1234-5678 milik admin -> ditulis "819012345678"
-  ADMIN_WHATSAPP: "819000000000",
+  // Contoh nomor Indonesia 0812-3456-7890 -> ditulis "6281234567890"
+  // Catatan: jika Supabase sudah dikonfigurasi, nilai ini akan otomatis diambil dari database
+  ADMIN_WHATSAPP: "6281234567890",
   CURRENCY_SYMBOL: "¥",
   STORE_NAME: "Warung Nusantara",
 };
 
 // Kategori produk yang tampil sebagai chip filter.
-// "id" HARUS sama persis dengan field "kategori" di data/products.json
+// "id" HARUS sama persis dengan field "kategori" di database/products.json
 const CATEGORIES = [
   { id: "semua", label: "Semua", icon: "🧺" },
   { id: "mie-instan", label: "Mie Instan", icon: "🍜" },
@@ -33,7 +38,7 @@ const FAQ_DATA = [
   {
     keywords: ["jam", "buka", "operasional", "jam berapa"],
     question: "Jam berapa admin biasanya membalas pesan?",
-    answer: "Admin standby setiap hari pukul 09.00–21.00 waktu Jepang. Di luar jam itu, pesan tetap masuk dan akan dibalas paling lambat keesokan harinya.",
+    answer: "Admin standby setiap hari pukul 09.00–21.00 WIB / 11.00–23.00 WIJ. Di luar jam itu, pesan tetap masuk dan akan dibalas paling lambat keesokan harinya.",
   },
   {
     keywords: ["ongkir", "kirim", "pengiriman", "berapa lama", "ekspedisi"],
@@ -41,14 +46,14 @@ const FAQ_DATA = [
     answer: "Ongkir dihitung berdasarkan berat & prefektur tujuan menggunakan Japan Post atau Yamato. Estimasi 2–5 hari kerja. Nominal pasti dikonfirmasi admin sebelum pembayaran.",
   },
   {
-    keywords: ["bayar", "pembayaran", "paypay", "transfer", "cara bayar"],
+    keywords: ["bayar", "pembayaran", "transfer", "cara bayar", "bca", "bri", "mandiri", "qris"],
     question: "Metode pembayaran apa saja yang diterima?",
-    answer: "Bisa transfer Bank Yucho/Japan Post Bank, PayPay, LINE Pay, bayar tunai di konbini, atau COD di titik kumpul tertentu. Detail rekening/QR dikirim admin saat checkout.",
+    answer: "Bisa transfer Bank Indonesia (BCA, BRI, Mandiri) atau QRIS. Detail nomor rekening dan QR dikirim admin saat checkout. Setelah transfer, upload bukti bayar di halaman konfirmasi pembayaran.",
   },
   {
     keywords: ["request", "barang khusus", "tidak ada", "pesan khusus", "cari barang"],
     question: "Bagaimana jika barang yang saya cari tidak ada di katalog?",
-    answer: "Isi form 'Request Barang Khusus' di halaman utama, atau chat admin langsung di sini. Admin akan cek ketersediaan & kirim penawaran harga via WhatsApp.",
+    answer: "Isi form 'Request Barang Khusus' di halaman utama, atau chat admin langsung. Admin akan cek ketersediaan & kirim penawaran harga via WhatsApp.",
   },
   {
     keywords: ["halal", "sertifikat"],
@@ -59,6 +64,11 @@ const FAQ_DATA = [
     keywords: ["minimal", "min order", "minimum belanja"],
     question: "Apakah ada minimal belanja?",
     answer: "Tidak ada minimal belanja untuk pemesanan reguler. Namun untuk efisiensi ongkir, kami sarankan belanja bersama teman satu asrama/apartemen.",
+  },
+  {
+    keywords: ["lacak", "status", "pesanan", "order"],
+    question: "Bagaimana cara lacak status pesanan saya?",
+    answer: "Setelah checkout, Anda mendapat nomor pesanan (contoh: WN-20240705-0001). Admin akan update status via WhatsApp. Bukti transfer dikirim lewat halaman konfirmasi pembayaran.",
   },
 ];
 
@@ -80,7 +90,7 @@ function formatYen(n) {
 }
 function loadCart() {
   try {
-    const raw = localStorage.getItem("wn_cart_v1");
+    const raw = localStorage.getItem("wn_cart_v2");
     return raw ? JSON.parse(raw) : {};
   } catch (e) {
     return {};
@@ -88,9 +98,9 @@ function loadCart() {
 }
 function saveCart() {
   try {
-    localStorage.setItem("wn_cart_v1", JSON.stringify(cart));
+    localStorage.setItem("wn_cart_v2", JSON.stringify(cart));
   } catch (e) {
-    /* localStorage tidak tersedia, keranjang hanya bertahan selama sesi ini */
+    /* localStorage tidak tersedia */
   }
 }
 function findProduct(id) {
@@ -99,29 +109,79 @@ function findProduct(id) {
 function waLink(phoneNumber, text) {
   return `https://wa.me/${phoneNumber}?text=${encodeURIComponent(text)}`;
 }
-function showToast(msg) {
+function showToast(msg, type = "default") {
   const toast = document.getElementById("toast");
   toast.textContent = msg;
-  toast.classList.add("show");
+  toast.className = `toast show ${type}`;
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => toast.classList.remove("show"), 2200);
+  showToast._t = setTimeout(() => toast.classList.remove("show"), 2800);
 }
 
 /* =====================================================
-   4. MEMUAT PRODUK
+   4. MEMUAT PRODUK (dari Supabase atau fallback JSON)
    ===================================================== */
 async function loadProducts() {
-  try {
-    const res = await fetch("data/products.json");
-    allProducts = await res.json();
-  } catch (err) {
-    console.error("Gagal memuat data/products.json. Jalankan situs lewat server lokal atau GitHub Pages, jangan buka file index.html langsung dari folder.", err);
-    allProducts = [];
+  const grid = document.getElementById("productGrid");
+  grid.innerHTML = `<div class="loading-skeleton">
+    ${Array(6).fill('<div class="skeleton-card"></div>').join("")}
+  </div>`;
+
+  // Coba load pengaturan toko dari Supabase
+  await loadStoreSettings();
+
+  // Coba load produk dari Supabase
+  if (isSupabaseConfigured()) {
+    try {
+      const sb = getSupabase();
+      const { data, error } = await sb
+        .from("products")
+        .select("*")
+        .eq("aktif", true)
+        .order("unggulan", { ascending: false })
+        .order("nama");
+
+      if (error) throw error;
+      allProducts = data || [];
+      console.log(`✅ ${allProducts.length} produk dimuat dari Supabase`);
+    } catch (err) {
+      console.error("Gagal memuat produk dari Supabase, menggunakan fallback JSON:", err);
+      await loadProductsFromJson();
+    }
+  } else {
+    // Fallback ke file JSON jika Supabase belum dikonfigurasi
+    console.info("ℹ️ Supabase belum dikonfigurasi. Menggunakan data/products.json (mode statis).");
+    await loadProductsFromJson();
   }
+
   document.getElementById("statProdukCount").textContent = allProducts.length;
   renderCategories();
   renderGrid();
   updateCartBadge();
+}
+
+async function loadProductsFromJson() {
+  try {
+    const res = await fetch("data/products.json");
+    allProducts = await res.json();
+  } catch (err) {
+    console.error("Gagal memuat data/products.json:", err);
+    allProducts = [];
+  }
+}
+
+async function loadStoreSettings() {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const sb = getSupabase();
+    const { data } = await sb.from("store_settings").select("key,value");
+    if (data) {
+      const settings = Object.fromEntries(data.map((r) => [r.key, r.value]));
+      if (settings.whatsapp_admin) CONFIG.ADMIN_WHATSAPP = settings.whatsapp_admin;
+      if (settings.store_name) CONFIG.STORE_NAME = settings.store_name;
+    }
+  } catch (err) {
+    console.warn("Gagal memuat pengaturan toko:", err);
+  }
 }
 
 /* =====================================================
@@ -147,7 +207,7 @@ function getFilteredProducts() {
     const matchSearch =
       !searchTerm ||
       p.nama.toLowerCase().includes(searchTerm) ||
-      p.deskripsi.toLowerCase().includes(searchTerm);
+      (p.deskripsi && p.deskripsi.toLowerCase().includes(searchTerm));
     return matchCat && matchSearch;
   });
 }
@@ -168,14 +228,18 @@ function renderGrid() {
     .map((p) => {
       const lowStock = p.stok <= 5 && p.stok > 0;
       const outOfStock = p.stok <= 0;
+      const mediaContent = p.gambar_url
+        ? `<img src="${p.gambar_url}" alt="${p.nama}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`
+        : (p.emoji || "🛍️");
       return `
       <article class="product-card" data-id="${p.id}">
         <div class="product-media">
-          ${p.emoji || "🛍️"}
+          ${mediaContent}
           ${p.unggulan ? '<span class="badge-fav">Favorit</span>' : ""}
+          ${outOfStock ? '<span class="badge-out">Habis</span>' : ""}
         </div>
         <div class="product-name">${p.nama}</div>
-        <div class="product-unit">${p.satuan}${outOfStock ? " · Habis" : lowStock ? ` · <span class="stock-low">Sisa ${p.stok}</span>` : ""}</div>
+        <div class="product-unit">${p.satuan}${lowStock ? ` · <span class="stock-low">Sisa ${p.stok}</span>` : ""}</div>
         <div class="price-tag">
           <span class="price">${formatYen(p.harga)}</span>
           <button class="add-btn" data-quickadd="${p.id}" aria-label="Tambah cepat" ${outOfStock ? "disabled style='opacity:.4'" : ""}>+</button>
@@ -186,7 +250,7 @@ function renderGrid() {
 
   grid.querySelectorAll(".product-card").forEach((card) => {
     card.addEventListener("click", (e) => {
-      if (e.target.closest("[data-quickadd]")) return; // ditangani terpisah
+      if (e.target.closest("[data-quickadd]")) return;
       openDetail(card.dataset.id);
     });
   });
@@ -208,7 +272,12 @@ function openDetail(id) {
   currentDetailProduct = p;
   detailQty = 1;
 
-  document.getElementById("detailMedia").textContent = p.emoji || "🛍️";
+  const mediaEl = document.getElementById("detailMedia");
+  if (p.gambar_url) {
+    mediaEl.innerHTML = `<img src="${p.gambar_url}" alt="${p.nama}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
+  } else {
+    mediaEl.textContent = p.emoji || "🛍️";
+  }
   document.getElementById("detailName").textContent = p.nama;
   document.getElementById("detailUnit").textContent = p.satuan + (p.stok <= 5 ? ` · Sisa ${p.stok}` : "");
   document.getElementById("detailDesc").textContent = p.deskripsi;
@@ -277,9 +346,12 @@ function renderCartItems() {
       .map(([id, qty]) => {
         const p = findProduct(id);
         if (!p) return "";
+        const media = p.gambar_url
+          ? `<img src="${p.gambar_url}" alt="${p.nama}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;">`
+          : `<div class="mini-media">${p.emoji || "🛍️"}</div>`;
         return `
         <div class="cart-item" data-id="${id}">
-          <div class="mini-media">${p.emoji || "🛍️"}</div>
+          ${media}
           <div class="info">
             <div class="name">${p.nama}</div>
             <div class="sub">${formatYen(p.harga)} / ${p.satuan}</div>
@@ -313,27 +385,127 @@ function closeCart() {
   document.getElementById("cartOverlay").classList.remove("open");
 }
 
-function buildCheckoutMessage() {
-  const lines = [`Halo Admin ${CONFIG.STORE_NAME}, saya mau pesan:`, ""];
+// Generate nomor pesanan: WN-YYYYMMDD-XXXX
+function generateOrderNumber() {
+  const d = new Date();
+  const date = d.toISOString().slice(0, 10).replace(/-/g, "");
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `WN-${date}-${rand}`;
+}
+
+function buildCartItemsSnapshot() {
+  return Object.entries(cart).map(([id, qty]) => {
+    const p = findProduct(id);
+    return {
+      id,
+      nama: p ? p.nama : id,
+      harga: p ? p.harga : 0,
+      satuan: p ? p.satuan : "",
+      qty,
+      subtotal: p ? p.harga * qty : 0,
+    };
+  });
+}
+
+function buildCheckoutMessage(orderNumber) {
+  const lines = [`Halo Admin ${CONFIG.STORE_NAME}! 🛒 Saya mau pesan:`, ""];
   Object.entries(cart).forEach(([id, qty]) => {
     const p = findProduct(id);
     if (!p) return;
     lines.push(`- ${p.nama} (${qty}x ${p.satuan}) = ${formatYen(p.harga * qty)}`);
   });
-  lines.push("", `Total: ${formatYen(cartTotal())}`, "", "Mohon info ongkir & cara pembayarannya. Terima kasih!");
+  lines.push(
+    "",
+    `Subtotal: ${formatYen(cartTotal())}`,
+    `No. Pesanan: ${orderNumber}`,
+    "",
+    "Mohon info ongkir & nomor rekening untuk pembayaran. Terima kasih! 🙏"
+  );
   return lines.join("\n");
 }
 
 /* =====================================================
-   8. FORM REQUEST BARANG KHUSUS
+   8. CHECKOUT — simpan ke database lalu buka WhatsApp
    ===================================================== */
-function handleRequestSubmit(e) {
+async function handleCheckout() {
+  if (cartCount() === 0) {
+    showToast("Keranjang masih kosong");
+    return;
+  }
+
+  const btn = document.getElementById("btnCheckout");
+  btn.disabled = true;
+  btn.textContent = "Memproses...";
+
+  const orderNumber = generateOrderNumber();
+  const items = buildCartItemsSnapshot();
+
+  // Simpan pesanan ke Supabase jika sudah dikonfigurasi
+  if (isSupabaseConfigured()) {
+    try {
+      const sb = getSupabase();
+      const { error } = await sb.from("orders").insert({
+        order_number: orderNumber,
+        nama_pembeli: "—", // akan diupdate admin setelah konfirmasi WhatsApp
+        whatsapp: "—",
+        items: items,
+        subtotal: cartTotal(),
+        status: "menunggu_konfirmasi",
+      });
+      if (error) throw error;
+      console.log("✅ Pesanan tersimpan ke database:", orderNumber);
+    } catch (err) {
+      console.error("Gagal menyimpan pesanan ke database:", err);
+      // Tetap lanjut buka WhatsApp walau gagal simpan ke DB
+    }
+  }
+
+  // Buka WhatsApp admin
+  window.open(waLink(CONFIG.ADMIN_WHATSAPP, buildCheckoutMessage(orderNumber)), "_blank");
+
+  // Tunjukkan info nomor pesanan & link konfirmasi bayar
+  closeCart();
+  showOrderConfirmModal(orderNumber);
+
+  btn.disabled = false;
+  btn.textContent = "Checkout via WhatsApp";
+}
+
+function showOrderConfirmModal(orderNumber) {
+  const modal = document.getElementById("orderConfirmModal");
+  document.getElementById("orderConfirmNumber").textContent = orderNumber;
+  // Link ke halaman konfirmasi pembayaran dengan nomor pesanan
+  const payLink = document.getElementById("orderConfirmPayLink");
+  payLink.href = `konfirmasi-bayar.html?order=${encodeURIComponent(orderNumber)}`;
+  modal.classList.add("open");
+}
+
+/* =====================================================
+   9. FORM REQUEST BARANG KHUSUS
+   ===================================================== */
+async function handleRequestSubmit(e) {
   e.preventDefault();
   const nama = document.getElementById("reqNama").value.trim();
   const kontak = document.getElementById("reqKontak").value.trim();
   const barang = document.getElementById("reqBarang").value.trim();
   const jumlah = document.getElementById("reqJumlah").value.trim();
   const catatan = document.getElementById("reqCatatan").value.trim();
+
+  const btn = e.target.querySelector("button[type=submit]");
+  btn.disabled = true;
+  btn.textContent = "Mengirim...";
+
+  // Simpan request ke Supabase jika sudah dikonfigurasi
+  if (isSupabaseConfigured()) {
+    try {
+      const sb = getSupabase();
+      const { error } = await sb.from("product_requests").insert({ nama, kontak, barang, jumlah, catatan });
+      if (error) throw error;
+      console.log("✅ Request barang tersimpan ke database");
+    } catch (err) {
+      console.error("Gagal menyimpan request ke database:", err);
+    }
+  }
 
   const text = [
     `Halo Admin ${CONFIG.STORE_NAME}, saya mau request barang khusus:`,
@@ -348,12 +520,15 @@ function handleRequestSubmit(e) {
     .join("\n");
 
   window.open(waLink(CONFIG.ADMIN_WHATSAPP, text), "_blank");
-  showToast("Membuka WhatsApp admin...");
+  showToast("Permintaan berhasil dikirim ke WhatsApp admin ✅", "success");
   e.target.reset();
+
+  btn.disabled = false;
+  btn.textContent = "Kirim Permintaan ke Admin";
 }
 
 /* =====================================================
-   9. FAQ ACCORDION
+   10. FAQ ACCORDION
    ===================================================== */
 function renderFaqAccordion() {
   const el = document.getElementById("faqList");
@@ -370,7 +545,7 @@ function renderFaqAccordion() {
 }
 
 /* =====================================================
-   10. CHATBOT SEDERHANA (rule-based, tanpa server)
+   11. CHATBOT SEDERHANA (rule-based, tanpa server)
    ===================================================== */
 function appendChatMessage(text, sender) {
   const body = document.getElementById("chatBody");
@@ -416,10 +591,7 @@ function handleChatSend() {
       link.href = waLink(CONFIG.ADMIN_WHATSAPP, `Halo Admin, saya ada pertanyaan: ${text}`);
       link.target = "_blank";
       link.className = "btn-primary";
-      link.style.display = "block";
-      link.style.textAlign = "center";
-      link.style.textDecoration = "none";
-      link.style.marginTop = "4px";
+      link.style.cssText = "display:block;text-align:center;text-decoration:none;margin-top:4px;";
       link.textContent = "Chat Admin di WhatsApp";
       body.appendChild(link);
       body.scrollTop = body.scrollHeight;
@@ -437,7 +609,7 @@ function closeChat() {
 }
 
 /* =====================================================
-   11. INISIALISASI & EVENT LISTENERS
+   12. INISIALISASI & EVENT LISTENERS
    ===================================================== */
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("thisYear").textContent = new Date().getFullYear();
@@ -493,12 +665,19 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cartOverlay").addEventListener("click", (e) => {
     if (e.target.id === "cartOverlay") closeCart();
   });
-  document.getElementById("btnCheckout").addEventListener("click", () => {
-    if (cartCount() === 0) {
-      showToast("Keranjang masih kosong");
-      return;
+  document.getElementById("btnCheckout").addEventListener("click", handleCheckout);
+
+  // Order confirm modal
+  document.getElementById("orderConfirmClose").addEventListener("click", () => {
+    document.getElementById("orderConfirmModal").classList.remove("open");
+    cart = {};
+    saveCart();
+    updateCartBadge();
+  });
+  document.getElementById("orderConfirmModal").addEventListener("click", (e) => {
+    if (e.target.id === "orderConfirmModal") {
+      document.getElementById("orderConfirmModal").classList.remove("open");
     }
-    window.open(waLink(CONFIG.ADMIN_WHATSAPP, buildCheckoutMessage()), "_blank");
   });
 
   // Request form
@@ -513,7 +692,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") handleChatSend();
   });
 
-  // Bottom nav — scroll ke section & tandai aktif
+  // Bottom nav
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));

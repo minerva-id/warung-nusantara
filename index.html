@@ -4,11 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Warung Nusantara — Rasa Indonesia di Jepang</title>
-<meta name="description" content="Toko online mie instan, bumbu dapur, dan kebutuhan konsumsi Indonesia untuk WNI dan pekerja migran Indonesia di Jepang.">
+<meta name="description" content="Toko online mie instan, bumbu dapur, dan kebutuhan konsumsi Indonesia untuk WNI dan pekerja migran Indonesia di Jepang. Bayar via transfer bank atau QRIS.">
+<meta name="theme-color" content="#1a0a00">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<!-- Supabase JS Client (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 
@@ -117,33 +120,32 @@
       <div class="pay-row">
         <div class="pay-icon">🏦</div>
         <div>
-          <div class="t">Transfer Bank (Yucho / Japan Post Bank)</div>
-          <div class="d">Cocok untuk pekerja migran, hampir semua orang punya rekening ini</div>
+          <div class="t">Transfer Bank Indonesia (BCA, BRI, Mandiri, BNI)</div>
+          <div class="d">Cocok untuk semua pembeli — transfer dari bank manapun ke rekening admin Indonesia</div>
         </div>
       </div>
       <div class="pay-row">
-        <div class="pay-icon">📱</div>
+        <div class="pay-icon">📲</div>
         <div>
-          <div class="t">PayPay / LINE Pay</div>
-          <div class="d">Bayar instan lewat scan QR, konfirmasi otomatis lebih cepat</div>
-        </div>
-      </div>
-      <div class="pay-row">
-        <div class="pay-icon">🏪</div>
-        <div>
-          <div class="t">Bayar di Konbini</div>
-          <div class="d">Setor tunai di Family Mart / Lawson / 7-Eleven terdekat</div>
+          <div class="t">QRIS — Scan & Bayar Universal</div>
+          <div class="d">Scan QR dari GoPay, OVO, DANA, BCA Mobile, atau aplikasi bank apapun yang mendukung QRIS</div>
         </div>
       </div>
       <div class="pay-row">
         <div class="pay-icon">🤝</div>
         <div>
           <div class="t">COD Titik Kumpul / Ambil Sendiri</div>
-          <div class="d">Untuk area tertentu yang ada jadwal COD komunitas</div>
+          <div class="d">Untuk area tertentu yang ada jadwal COD komunitas WNI di Jepang</div>
         </div>
       </div>
     </div>
-    <p class="form-note" style="margin-top:12px;">Detail nomor rekening &amp; QR pembayaran dikirim admin saat checkout via WhatsApp.</p>
+    <div class="pay-cta-box">
+      <div>
+        <strong>Sudah transfer?</strong>
+        <p>Upload bukti pembayaran supaya admin bisa segera memproses pesanan Anda.</p>
+      </div>
+      <a href="konfirmasi-bayar.html" class="btn-primary" style="text-decoration:none;display:inline-block;text-align:center;min-width:180px;">📤 Upload Bukti Bayar</a>
+    </div>
   </section>
 
   <!-- ============ FAQ ============ -->
@@ -160,8 +162,9 @@
     <p>Toko online kebutuhan pangan Indonesia untuk WNI dan Pekerja Migran Indonesia (PMI) di seluruh Jepang. Dikelola oleh dan untuk komunitas perantauan.</p>
     <div class="footer-links">
       <a href="#" id="footerWaLink">💬 Chat Admin via WhatsApp</a>
+      <a href="konfirmasi-bayar.html">📤 Konfirmasi Pembayaran</a>
       <a href="#" onclick="return false;">📍 Area kirim: Seluruh Jepang (JP Post / Yamato)</a>
-      <a href="admin.html">🔐 Halaman Admin Katalog</a>
+      <a href="admin.html">🔐 Halaman Admin</a>
     </div>
     <div class="footer-bottom">
       *Produk bersertifikat halal ditandai pada tiap item. Selalu periksa label kemasan.<br>
@@ -234,8 +237,26 @@
 
   <div class="toast" id="toast">Ditambahkan ke keranjang</div>
 
+  <!-- ============ ORDER CONFIRM MODAL ============ -->
+  <div class="sheet-overlay" id="orderConfirmModal">
+    <div class="sheet order-confirm-sheet">
+      <div class="order-confirm-icon">🎉</div>
+      <h3>Pesanan Berhasil Dibuat!</h3>
+      <p>Nomor pesanan Anda:</p>
+      <div class="order-number-display" id="orderConfirmNumber">WN-...</div>
+      <p style="font-size:13px;color:var(--muted);margin-top:8px;">
+        WhatsApp ke admin sudah terbuka. Setelah transfer, upload bukti pembayaran di bawah ini.
+      </p>
+      <a id="orderConfirmPayLink" href="konfirmasi-bayar.html" class="btn-primary" style="text-decoration:none;display:block;text-align:center;margin:12px 0 8px;">
+        📤 Upload Bukti Pembayaran
+      </a>
+      <button class="btn-secondary" id="orderConfirmClose">Tutup & Lanjut Belanja</button>
+    </div>
+  </div>
+
 </div>
 
+<script src="js/supabase-config.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

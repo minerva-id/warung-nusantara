@@ -1,241 +1,298 @@
-# 📖 Dokumentasi Warung Nusantara
+# 📖 Dokumentasi Warung Nusantara — Versi Supabase
 
-Dokumentasi ini untuk pemilik toko yang **tidak harus bisa coding**. Ikuti langkah-langkah di bawah sesuai kebutuhan Anda.
+Dokumentasi ini untuk pemilik toko. Tidak perlu coding — ikuti langkah-langkah di bawah sesuai kebutuhan.
 
 ---
 
 ## Daftar Isi
 
-1. [Ringkasan Proyek](#ringkasan-proyek)
-2. [Menjalankan di Lokal](#menjalankan-di-lokal)
-3. [Deploy ke GitHub Pages](#deploy-ke-github-pages)
-4. [Konfigurasi Wajib Sebelum Go-Live](#konfigurasi-wajib-sebelum-go-live)
-5. [Menambah & Mengubah Produk](#menambah--mengubah-produk)
-6. [Mengatur Harga & Stok](#mengatur-harga--stok)
-7. [Cara Kerja Request Barang Khusus & Chatbot](#cara-kerja-request-barang-khusus--chatbot)
-8. [Rencana & Rekomendasi Metode Pembayaran](#rencana--rekomendasi-metode-pembayaran)
-9. [Batasan Teknis Saat Ini](#batasan-teknis-saat-ini)
-10. [Checklist Sebelum Go-Live](#checklist-sebelum-go-live)
+1. [Apa yang Baru di Versi Ini](#apa-yang-baru)
+2. [Arsitektur Sistem](#arsitektur-sistem)
+3. [Setup Supabase (Wajib untuk Fitur Database)](#setup-supabase)
+4. [Menjalankan di Lokal](#menjalankan-di-lokal)
+5. [Deploy ke GitHub Pages](#deploy-ke-github-pages)
+6. [Konfigurasi Wajib Sebelum Go-Live](#konfigurasi-wajib)
+7. [Mengelola Produk via Admin Panel](#mengelola-produk)
+8. [Memproses Pesanan](#memproses-pesanan)
+9. [Verifikasi Konfirmasi Pembayaran](#verifikasi-pembayaran)
+10. [Pengaturan Toko (Nomor Rekening dll.)](#pengaturan-toko)
+11. [Batasan & Pertimbangan Keamanan](#batasan)
+12. [Checklist Sebelum Go-Live](#checklist)
 
 ---
 
-## Ringkasan Proyek
+## Apa yang Baru di Versi Ini {#apa-yang-baru}
 
-Warung Nusantara adalah website toko online **mobile-first** (dioptimalkan untuk HP, tapi tetap enak dilihat di laptop) yang dibangun sebagai **situs statis** — artinya tidak ada server/database di belakangnya. Semua data produk disimpan dalam satu file `data/products.json`, dan proses checkout maupun request barang dikirim sebagai pesan **WhatsApp** ke admin karena belum ada payment gateway otomatis.
+Versi ini adalah upgrade besar dari situs statis sebelumnya:
 
-Pendekatan ini sengaja dipilih supaya:
-- **Gratis di-hosting** (lewat GitHub Pages).
-- **Tidak butuh biaya server bulanan.**
-- **Mudah dikelola** pemilik toko tanpa perlu tim developer tetap.
-- Tetap bisa **berkembang** ke sistem yang lebih otomatis di masa depan (lihat bagian [Batasan Teknis](#batasan-teknis-saat-ini)).
+| Fitur | Sebelumnya | Sekarang |
+|---|---|---|
+| **Katalog produk** | File JSON, edit manual | Database Supabase, edit langsung dari admin panel |
+| **Admin login** | Password tersimpan di kode sumber | Supabase Auth (email + password, hash bcrypt, JWT aman) |
+| **Pesanan** | Hanya via WhatsApp, tidak tercatat | Tersimpan ke database, admin bisa kelola status |
+| **Pembayaran** | Info rekening manual di WhatsApp | Halaman konfirmasi bayar, customer upload bukti, admin verifikasi |
+| **Request barang** | WhatsApp saja | Tersimpan ke database + WhatsApp |
+| **Rekening** | Japan Post Bank (Yucho) | Bank Indonesia (BCA, BRI, Mandiri) + QRIS |
+| **Pengaturan toko** | Edit file JS | Formulir di admin panel (tanpa coding) |
+| **Fallback** | — | Jika Supabase belum dikonfigurasi, situs tetap berjalan dengan file JSON |
 
 ---
 
-## Menjalankan di Lokal
+## Arsitektur Sistem {#arsitektur-sistem}
 
-Karena situs memuat data produk lewat `fetch()`, Anda **tidak bisa** membuka `index.html` dengan klik dua kali (browser akan memblokirnya). Gunakan salah satu cara berikut:
+```
+Pembeli                Admin
+  │                      │
+  ▼                      ▼
+index.html          admin.html
+(katalog, cart)    (kelola produk,
+konfirmasi-bayar.html  pesanan, bayar)
+  │                      │
+  └──────────────────────┘
+              │
+         Supabase
+    ┌──────────────────┐
+    │ Database (PG)    │
+    │ - products       │
+    │ - orders         │
+    │ - payment_confs  │
+    │ - product_reqs   │
+    │ - store_settings │
+    │                  │
+    │ Auth             │
+    │ - Admin login    │
+    │                  │
+    │ Storage          │
+    │ - bukti-bayar/   │
+    │ - product-imgs/  │
+    └──────────────────┘
+```
 
-**Opsi A — Python (paling mudah, biasanya sudah terpasang di Mac/Linux):**
+Situs tetap **100% statis** (tidak ada server Node.js/Express). Supabase bertindak sebagai backend gratis.
+
+---
+
+## Setup Supabase {#setup-supabase}
+
+### Langkah 1 — Buat Akun & Project
+
+1. Buka [supabase.com](https://supabase.com) → klik **Start your project** (gratis, tidak perlu kartu kredit).
+2. Login dengan GitHub atau email.
+3. Klik **New project**.
+4. Isi:
+   - **Name**: `warung-nusantara` (bebas)
+   - **Database Password**: buat password kuat, simpan di tempat aman
+   - **Region**: pilih **Northeast Asia (Tokyo)** untuk performa terbaik
+5. Klik **Create new project**. Tunggu ~1 menit hingga project siap.
+
+### Langkah 2 — Ambil Kunci API
+
+1. Di dashboard Supabase → klik **Settings** (ikon gear kiri bawah) → **API**.
+2. Catat dua nilai:
+   - **Project URL**: contoh `https://abcdefghijkl.supabase.co`
+   - **anon public key**: string panjang dimulai `eyJhbGci...`
+
+### Langkah 3 — Isi Konfigurasi Situs
+
+Buka file `js/supabase-config.js` dan isi:
+
+```js
+const SUPABASE_URL = "https://abcdefghijkl.supabase.co"; // ← ganti dengan URL Anda
+const SUPABASE_ANON_KEY = "eyJhbGci...";                  // ← ganti dengan anon key Anda
+```
+
+> **Aman**: `anon key` boleh ada di kode sumber publik. Key ini hanya bisa membaca/menulis sesuai aturan RLS (Row Level Security) yang sudah dibuat — tidak bisa mengakses data admin.
+
+### Langkah 4 — Jalankan Schema Database
+
+1. Di dashboard Supabase → klik **SQL Editor** → **New query**.
+2. Buka file `supabase-schema.sql` dari folder project.
+3. Salin seluruh isinya → tempel di SQL Editor → klik **Run** (▶).
+4. Tunggu hingga semua query selesai. Tabel, kebijakan keamanan, dan data produk awal akan terbuat otomatis.
+
+### Langkah 5 — Buat Akun Admin
+
+1. Di dashboard Supabase → **Authentication** → **Users** → **Invite user** (atau **Add user**).
+2. Masukkan email admin Anda dan password yang kuat.
+3. Selesai! Gunakan email & password ini untuk login di `admin.html`.
+
+> **Penting**: Ini adalah akun yang aman. Password di-hash secara otomatis oleh Supabase (bcrypt). Tidak tersimpan di kode sumber.
+
+### Langkah 6 — Setup Storage Buckets
+
+Storage sudah dibuat otomatis lewat SQL schema. Untuk memverifikasi:
+
+1. Di dashboard Supabase → **Storage**.
+2. Pastikan ada dua bucket: `bukti-bayar` dan `product-images`.
+3. `bukti-bayar`: private (hanya admin yang bisa melihat).
+4. `product-images`: public (foto produk bisa dilihat semua orang).
+
+---
+
+## Menjalankan di Lokal {#menjalankan-di-lokal}
+
+Situs memuat data lewat `fetch()`, jadi **tidak bisa** dibuka langsung dengan klik dua kali file HTML.
+
+**Opsi A — Python:**
 ```bash
 cd warung-nusantara
 python3 -m http.server 8080
 ```
-Lalu buka `http://localhost:8080` di browser.
+Buka `http://localhost:8080` di browser.
 
-**Opsi B — Ekstensi "Live Server" di VS Code:**
-Klik kanan pada `index.html` → "Open with Live Server".
-
----
-
-## Deploy ke GitHub Pages
-
-Repository ini bisa langsung online gratis lewat GitHub Pages:
-
-1. Buka repository di GitHub → tab **Settings**.
-2. Di menu kiri, klik **Pages**.
-3. Pada bagian **Source**, pilih branch `main` dan folder `/ (root)`.
-4. Klik **Save**.
-5. Tunggu 1–2 menit, GitHub akan memberi URL seperti:
-   `https://minerva-id.github.io/warung-nusantara/`
-6. Bagikan tautan ini ke pelanggan.
-
-Setiap kali Anda mengunggah perubahan file ke branch `main` (misalnya `data/products.json` yang baru), situs akan otomatis diperbarui dalam 1–2 menit.
+**Opsi B — VS Code Live Server:**
+Klik kanan `index.html` → **Open with Live Server**.
 
 ---
 
-## Konfigurasi Wajib Sebelum Go-Live
+## Deploy ke GitHub Pages {#deploy-ke-github-pages}
 
-Sebelum situs dibagikan ke pelanggan, buka file `js/main.js` dan ubah baris berikut di bagian paling atas:
+1. Repository GitHub → tab **Settings** → **Pages**.
+2. Source: branch `main`, folder `/ (root)`.
+3. Klik **Save**. Tunggu 1–2 menit.
+4. URL akan seperti: `https://username.github.io/warung-nusantara/`
 
+Setiap push ke branch `main` akan memperbarui situs otomatis.
+
+---
+
+## Konfigurasi Wajib Sebelum Go-Live {#konfigurasi-wajib}
+
+### 1. Isi Supabase Config
+
+Buka `js/supabase-config.js`:
 ```js
-const CONFIG = {
-  ADMIN_WHATSAPP: "819000000000",   // ⬅️ GANTI dengan nomor WhatsApp admin
-  CURRENCY_SYMBOL: "¥",
-  STORE_NAME: "Warung Nusantara",
-};
+const SUPABASE_URL = "https://XXXXXX.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGci...";
 ```
 
-**Format nomor WhatsApp:** kode negara + nomor tanpa angka 0 di depan, tanpa spasi/tanda hubung.
-Contoh: nomor Jepang `090-1234-5678` → ditulis `"819012345678"`.
+### 2. Isi Nomor Rekening via Admin Panel
 
-Tanpa langkah ini, tombol checkout dan chatbot akan mengarah ke nomor contoh yang tidak aktif.
+Setelah login di `admin.html` → tab **⚙️ Pengaturan** → isi:
+- Nomor WhatsApp admin
+- Nama & nomor rekening BCA, BRI, Mandiri (isi yang Anda punya saja)
+- Centang "QRIS Tersedia" jika ada
+
+### 3. Update Nomor WhatsApp Fallback di main.js
+
+Buka `js/main.js` baris paling atas:
+```js
+ADMIN_WHATSAPP: "6281234567890",  // ← ganti format: 62 + nomor tanpa 0 depan
+```
+Ini dipakai jika Supabase belum memuat pengaturan.
 
 ---
 
-## Menambah & Mengubah Produk
+## Mengelola Produk via Admin Panel {#mengelola-produk}
 
-Ada dua cara. Pilih yang paling nyaman untuk Anda.
+1. Buka `admin.html` → login dengan email & password admin.
+2. Tab **🏷️ Produk** sudah terbuka otomatis.
+3. **Tambah produk**: isi form "Tambah Produk Baru" → klik **+ Tambah ke Database**.
+4. **Ubah produk**: klik langsung pada kolom tabel → ubah nilai → klik **💾** untuk menyimpan.
+5. **Hapus/nonaktifkan produk**: klik **🗑** → produk menjadi tidak aktif (tidak tampil di katalog) tapi data tetap tersimpan.
+6. Perubahan langsung tampil di toko dalam hitungan detik (tidak perlu upload ulang file!).
 
-### Cara 1 — Lewat Halaman Admin (tanpa coding, direkomendasikan)
+---
 
-1. Buka `admin.html` (contoh: `https://minerva-id.github.io/warung-nusantara/admin.html`).
-2. Masukkan kata sandi admin (default: `nusantara2026` — **segera ganti**, lihat catatan keamanan di bawah).
-3. Klik **"Muat dari data/products.json"** untuk memuat katalog yang sedang aktif.
-4. Untuk **menambah produk baru**: isi form di bagian "2. Tambah Produk Baru", lalu klik **"+ Tambah ke Tabel"**.
-5. Untuk **mengubah produk** (nama, kategori, harga, satuan, stok, emoji): klik langsung pada kolom di tabel dan ketik nilai barunya.
-6. Untuk **menghapus produk**: klik tombol **"Hapus"** di baris produk terkait.
-7. Setelah semua perubahan selesai, klik **"⬇ Unduh products.json"**. File baru akan terunduh ke folder Downloads Anda.
-8. Ganti file lama di repository:
-   - Buka repository di GitHub → masuk ke folder `data/`.
-   - Klik file `products.json` lama → klik ikon pensil (Edit) atau tombol **Upload files** untuk mengganti dengan file yang baru diunduh.
-   - Klik **Commit changes**.
-9. Tunggu 1–2 menit, katalog di situs akan otomatis diperbarui.
+## Memproses Pesanan {#memproses-pesanan}
 
-> **Catatan keamanan halaman admin:** kata sandi di `admin.html` hanya proteksi ringan di sisi browser (siapa pun yang membaca kode sumber halaman bisa menemukannya). Ini **cukup untuk mencegah pengunjung biasa "iseng" membuka halaman admin**, tapi **bukan pengganti keamanan sungguhan**. Jangan gunakan halaman ini untuk data sensitif. Untuk keamanan penuh, lihat rekomendasi di bagian [Batasan Teknis](#batasan-teknis-saat-ini).
-
-### Cara 2 — Edit Langsung File JSON (untuk yang terbiasa teknis)
-
-Buka `data/products.json` dan tambahkan objek baru mengikuti format ini:
-
-```json
-{
-  "id": "mie-sarimi-soto",
-  "kategori": "mie-instan",
-  "nama": "Sarimi Soto Koya",
-  "deskripsi": "Mi kuah rasa soto dengan koya renyah.",
-  "harga": 460,
-  "satuan": "pak isi 5",
-  "stok": 25,
-  "tag": ["halal"],
-  "emoji": "🍜",
-  "unggulan": false
-}
+### Alur pesanan:
+```
+Pembeli checkout → WhatsApp dibuka → Admin konfirmasi via WA
+→ Admin input info ongkir → Pembeli transfer
+→ Pembeli upload bukti di konfirmasi-bayar.html
+→ Admin verifikasi di admin panel → Pesanan diproses & dikirim
 ```
 
-**Penjelasan setiap kolom (field):**
-
-| Kolom | Wajib? | Keterangan |
-|---|---|---|
-| `id` | Ya | Kode unik, huruf kecil & tanda hubung, tidak boleh sama dengan produk lain |
-| `kategori` | Ya | Harus salah satu dari: `mie-instan`, `bumbu-dapur`, `sembako`, `snack`, `minuman`, `bahan-segar` (kategori baru bisa ditambah, lihat catatan di bawah) |
-| `nama` | Ya | Nama produk yang tampil ke pembeli |
-| `deskripsi` | Ya | Deskripsi singkat, tampil di halaman detail produk |
-| `harga` | Ya | Angka saja, dalam Yen (¥), tanpa titik/koma |
-| `satuan` | Ya | Contoh: "pak isi 5", "botol 275ml", "5 kg" |
-| `stok` | Ya | Angka. Jika ≤ 5 akan muncul label "Sisa X" berwarna merah; jika 0 dianggap habis |
-| `tag` | Tidak | Daftar label kecil, contoh: `["halal", "pedas", "favorit"]` |
-| `emoji` | Tidak | Emoji sebagai ikon produk (belum pakai foto asli, lihat catatan di bawah) |
-| `unggulan` | Tidak | `true` untuk menampilkan badge "Favorit" di kartu produk |
-
-**Menambah kategori baru:** jika Anda menambah kategori (misalnya `bumbu-dapur` menjadi ada `bumbu-basah`), tambahkan juga entrinya di array `CATEGORIES` pada `js/main.js` (dan pada `<select>` kategori di `admin.html`) supaya muncul sebagai filter.
-
-**Menggunakan foto produk asli (bukan emoji):** saat ini produk memakai emoji sebagai ikon supaya situs ringan tanpa perlu upload gambar. Untuk pakai foto asli:
-1. Simpan foto di folder `assets/` (contoh: `assets/indomie-goreng.jpg`).
-2. Tambahkan kolom `"gambar": "assets/indomie-goreng.jpg"` pada produk di `products.json`.
-3. Di `js/main.js`, ganti bagian yang menampilkan `p.emoji` pada fungsi `renderGrid()` dan `openDetail()` menjadi elemen `<img src="${p.gambar}">` bila kolom `gambar` tersedia. (Ini butuh sedikit penyesuaian kode; hubungi developer Anda bila perlu bantuan.)
+### Di Admin Panel:
+1. Tab **📦 Pesanan** → klik Refresh.
+2. Ubah status pesanan dengan dropdown:
+   - `menunggu_konfirmasi` → **Baru masuk, belum dibalas**
+   - `dikonfirmasi` → **Sudah dibalas admin via WA**
+   - `menunggu_bayar` → **Info ongkir sudah dikirim, tunggu transfer**
+   - `bukti_diterima` → **Customer sudah upload bukti** (otomatis dari halaman konfirmasi)
+   - `diproses` → **Sedang dikemas**
+   - `dikirim` → **Sudah dikirim ke ekspedisi**
+   - `selesai` → **Pesanan selesai**
+3. Klik **Simpan** setelah mengubah status.
 
 ---
 
-## Mengatur Harga & Stok
+## Verifikasi Konfirmasi Pembayaran {#verifikasi-pembayaran}
 
-Harga dan stok adalah kolom `harga` dan `stok` pada tiap produk (lihat tabel di atas). Bisa diubah lewat:
-- **Halaman admin** (Cara 1 di atas) — paling praktis untuk perubahan harian.
-- **Edit langsung JSON** (Cara 2) — untuk perubahan massal atau impor dari Excel.
+### Cara customer mengirim bukti:
+1. Customer checkout → WhatsApp terbuka → Customer mendapat nomor pesanan.
+2. Customer buka `konfirmasi-bayar.html` (ada link di modal setelah checkout dan di footer).
+3. Customer pilih metode bayar → isi detail → upload foto struk → klik Kirim.
+4. Data tersimpan ke database, status pesanan otomatis berubah ke `bukti_diterima`.
 
-**Tips mengelola harga:**
-- Harga ditampilkan apa adanya (dalam Yen), jadi pastikan sudah termasuk margin keuntungan Anda sebelum disimpan.
-- Situs belum menghitung ongkos kirim otomatis — ongkir tetap dikonfirmasi manual oleh admin lewat WhatsApp setelah checkout. Jika volume order sudah tinggi, ini adalah kandidat pertama untuk diotomatisasi (lihat [Batasan Teknis](#batasan-teknis-saat-ini)).
-- Stok tidak berkurang otomatis saat ada pesanan (karena tidak ada database). Admin perlu mengurangi stok secara manual di `products.json`/halaman admin setelah pesanan dikonfirmasi.
-
----
-
-## Cara Kerja Request Barang Khusus & Chatbot
-
-**Form Request Barang Khusus** (di halaman utama, bagian "Tidak Ketemu Barangnya?"):
-- Pembeli mengisi nama, kontak, nama barang, jumlah, dan catatan.
-- Saat "Kirim Permintaan ke Admin" ditekan, situs otomatis membuka WhatsApp dengan pesan yang sudah terisi lengkap, dikirim ke nomor admin di `CONFIG.ADMIN_WHATSAPP`.
-- Tidak ada data yang tersimpan di server — semua histori permintaan ada di chat WhatsApp Anda.
-
-**Chatbot Admin** (ikon 💬 mengambang):
-- Ini adalah chatbot sederhana berbasis kata kunci (bukan AI), yang menjawab pertanyaan umum seperti jam operasional, ongkir, cara bayar, dan cara request barang.
-- Jika pertanyaan pembeli tidak dikenali, chatbot akan menawarkan tombol untuk lanjut chat langsung ke WhatsApp admin.
-- **Mengubah/menambah jawaban chatbot:** edit array `FAQ_DATA` di `js/main.js`. Setiap entri punya:
-  ```js
-  {
-    keywords: ["ongkir", "kirim"],   // kata kunci pemicu
-    question: "Berapa ongkir?",       // ditampilkan di FAQ & tombol saran chat
-    answer: "Jawaban lengkapnya...",
-  }
-  ```
-  Tambahkan objek baru ke array ini untuk menambah topik FAQ baru — otomatis akan muncul juga di bagian "Pertanyaan Umum" pada halaman utama.
+### Cara admin verifikasi:
+1. Di admin panel → tab **💳 Konfirmasi Bayar** → Refresh.
+2. Klik **📷 Lihat** untuk melihat foto bukti (hanya admin yang bisa akses).
+3. Klik **✓ Verifikasi** jika sesuai, atau **✗ Tolak** jika tidak sesuai.
+4. Hubungi customer via WhatsApp jika ada masalah.
 
 ---
 
-## Rencana & Rekomendasi Metode Pembayaran
+## Pengaturan Toko {#pengaturan-toko}
 
-> Catatan: saya bukan penasihat keuangan atau hukum. Bagian ini adalah gambaran umum opsi teknis yang tersedia — untuk kepastian pajak, izin usaha, dan kepatuhan terhadap regulasi Jepang (misalnya aturan penjualan makanan/impor), sebaiknya berkonsultasi dengan akuntan atau konsultan bisnis setempat.
+Di admin panel → tab **⚙️ Pengaturan**:
 
-Karena situs ini statis (tanpa backend), pembayaran saat ini **belum otomatis** — checkout hanya menyiapkan pesan pesanan lewat WhatsApp, lalu admin dan pembeli menyepakati metode bayar secara manual. Berikut rencana bertahap:
+| Setting | Keterangan |
+|---|---|
+| `whatsapp_admin` | Nomor WA admin: `6281234567890` (format 62 + nomor tanpa 0) |
+| `store_name` | Nama toko yang tampil di situs |
+| `bank_bca_atas_nama` | Nama pemilik rekening BCA |
+| `bank_bca_nomor` | Nomor rekening BCA |
+| `bank_bri_atas_nama` | Nama pemilik rekening BRI (kosongkan jika tidak punya) |
+| `bank_bri_nomor` | Nomor rekening BRI |
+| `bank_mandiri_atas_nama` | Nama pemilik rekening Mandiri |
+| `bank_mandiri_nomor` | Nomor rekening Mandiri |
+| `qris_tersedia` | `true` atau `false` |
+| `jam_operasional` | Tampil di FAQ dan chatbot |
 
-### Fase 1 (Sekarang — MVP, tanpa biaya integrasi)
-
-| Metode | Kelebihan | Kekurangan | Paling cocok untuk |
-|---|---|---|---|
-| **Transfer Bank** (Japan Post Bank / Yucho) | Hampir semua PMI & WNI di Jepang punya rekening ini; tanpa biaya tambahan | Konfirmasi manual, admin perlu cek mutasi & bukti transfer satu per satu | Transaksi rutin, pelanggan tetap |
-| **PayPay / LINE Pay** | Transfer instan via QR, tercatat otomatis di riwayat aplikasi | Tidak semua pembeli sudah punya akun/saldo | Pembeli yang terbiasa cashless |
-| **Bayar Tunai di Konbini** (manual) | Bisa dipakai walau belum punya rekening bank Jepang | Prosesnya lebih ribet tanpa payment gateway (perlu kirim kode bayar manual) | PMI yang baru datang & belum punya rekening |
-| **COD / Titik Kumpul Komunitas** | Tanpa biaya transaksi, membangun kepercayaan | Terbatas area & jadwal, perlu koordinasi logistik | Kota dengan komunitas WNI padat (Tokyo, Osaka, Aichi, dll.) |
-
-### Fase 2 (Setelah order rutin & stabil)
-
-Pertimbangkan integrasi **payment gateway** seperti **Stripe** (mendukung kartu kredit/debit dan pembayaran konbini otomatis di Jepang) atau layanan lokal seperti **Square** / **Univapay**. Ini butuh sedikit pengembangan backend (situs statis saat ini tidak cukup — perlu server kecil untuk memproses transaksi dengan aman), tapi manfaatnya:
-- Pembayaran & konfirmasi otomatis, admin tidak perlu cek manual satu-satu.
-- Bisa menerima kartu kredit/debit dari pembeli yang lebih nyaman pakai itu.
-- Rekonsiliasi keuangan lebih rapi untuk laporan/pajak.
-
-### Fase 3 (Skala lebih besar)
-
-- Sistem poin loyalitas / member untuk pelanggan tetap.
-- Integrasi dengan kasir toko fisik bila Warung Nusantara membuka lokasi offline.
-- Otomatisasi hitung ongkir berdasarkan berat & prefektur tujuan (integrasi API Japan Post/Yamato).
+Perubahan di sini langsung mempengaruhi halaman konfirmasi bayar — nomor rekening yang tampil ke customer akan diperbarui otomatis.
 
 ---
 
-## Batasan Teknis Saat Ini
+## Batasan & Pertimbangan Keamanan {#batasan}
 
-Situs ini adalah **situs statis** (HTML/CSS/JS murni, tanpa server atau database). Ini membuatnya gratis dan mudah dikelola, tapi ada beberapa batasan yang perlu dipahami pemilik toko:
+### Yang sudah lebih baik dari versi sebelumnya:
+- ✅ **Auth aman**: password admin di-hash bcrypt oleh Supabase, tidak ada di kode sumber.
+- ✅ **Database terpusat**: beberapa admin bisa mengelola bersamaan.
+- ✅ **Pesanan tercatat**: ada histori pesanan dan konfirmasi bayar.
+- ✅ **Foto bukti bayar**: tersimpan di Supabase Storage, hanya admin yang bisa akses.
 
-- **Tidak ada database pusat.** Katalog produk hanya berupa satu file JSON yang di-edit manual/lewat halaman admin. Cocok untuk puluhan–ratusan produk, tapi akan merepotkan bila katalog sudah sangat besar atau dikelola banyak admin sekaligus.
-- **Keranjang belanja tersimpan di browser masing-masing pembeli** (localStorage), bukan di server. Jika pembeli ganti perangkat/browser, keranjang akan kosong lagi.
-- **Checkout & request barang belum otomatis** — semuanya lewat WhatsApp manual. Tidak ada sistem pelacakan status pesanan otomatis.
-- **Chatbot bersifat rule-based sederhana**, bukan AI — hanya mencocokkan kata kunci, bukan memahami konteks percakapan.
-- **Halaman admin tidak memiliki otentikasi sungguhan.** Kata sandinya tersimpan di kode sumber (dapat dilihat siapa pun yang memeriksa file `js/admin.js`). Ini cukup untuk mencegah pengunjung biasa, tapi tidak aman dari orang yang sengaja ingin membaca kode sumber.
+### Batasan yang masih ada:
+- ❌ **Keranjang belanja masih localStorage**: ganti device/browser = keranjang kosong. Ini pilihan desain untuk kecepatan — bisa diubah ke Supabase di versi selanjutnya.
+- ❌ **Tidak ada payment gateway otomatis**: pembayaran masih perlu verifikasi manual admin.
+- ❌ **Stok tidak berkurang otomatis**: admin perlu update stok manual setelah pesanan dikonfirmasi.
+- ❌ **Chatbot masih rule-based**: hanya cocokkan kata kunci, bukan AI.
 
-**Jika bisnis berkembang, rekomendasi langkah lanjutan:**
-1. Pindahkan katalog ke database sungguhan (mis. Google Sheets sebagai CMS ringan, Airtable, atau database seperti Supabase/Firebase) supaya banyak admin bisa mengelola bersamaan dengan aman.
-2. Tambahkan backend kecil (mis. Node.js/Express) untuk memproses form request & checkout secara otomatis, plus autentikasi admin yang sesungguhnya (login dengan hash password, bukan password polos di kode).
-3. Integrasikan payment gateway (Fase 2 di atas) agar pembayaran terverifikasi otomatis.
+### Batas Gratis Supabase (Free Tier):
+| Fitur | Batas Gratis |
+|---|---|
+| Database | 500 MB |
+| Storage | 1 GB |
+| Auth users | 50.000 |
+| API requests | 2 juta/bulan |
+| Bandwidth | 5 GB/bulan |
+
+Untuk toko kecil-menengah, ini lebih dari cukup. Upgrade ke paid plan (~$25/bulan) jika sudah lebih besar.
 
 ---
 
-## Checklist Sebelum Go-Live
+## Checklist Sebelum Go-Live {#checklist}
 
-- [ ] Ganti `ADMIN_WHATSAPP` di `js/main.js` dengan nomor WhatsApp admin yang aktif
-- [ ] Ganti kata sandi default `ADMIN_PASSWORD` di `js/admin.js`
-- [ ] Isi ulang `data/products.json` dengan produk & harga asli (contoh data saat ini hanya untuk demo)
-- [ ] Cek ulang semua harga sudah termasuk margin keuntungan
-- [ ] Tes buka situs di HP (Android & iPhone) untuk memastikan tampilan rapi
-- [ ] Tes kirim pesan lewat tombol checkout, form request, dan chatbot — pastikan WhatsApp terbuka dengan benar
-- [ ] Aktifkan GitHub Pages dan catat URL situs untuk dibagikan
-- [ ] Siapkan nomor rekening/QR PayPay untuk dikirim admin saat ada pesanan masuk
-- [ ] (Opsional) Cek ketentuan penjualan makanan & pajak usaha kecil di Jepang bersama konsultan/akuntan setempat
+- [ ] Buat akun Supabase dan project baru
+- [ ] Jalankan `supabase-schema.sql` di SQL Editor
+- [ ] Isi `js/supabase-config.js` dengan URL dan anon key Supabase
+- [ ] Buat akun admin di Supabase Authentication
+- [ ] Login di `admin.html` → tab Pengaturan → isi nomor WhatsApp dan rekening bank
+- [ ] Perbarui katalog produk di tab Produk (hapus/tambah sesuai stok asli)
+- [ ] Isi `ADMIN_WHATSAPP` fallback di `js/main.js` dan `js/konfirmasi-bayar.js`
+- [ ] Test checkout: pesan produk, cek WhatsApp terbuka, cek pesanan muncul di admin panel
+- [ ] Test konfirmasi bayar: buka `konfirmasi-bayar.html`, isi form, cek data muncul di tab Konfirmasi Bayar
+- [ ] Test halaman admin: verifikasi konfirmasi, ubah status pesanan
+- [ ] Deploy ke GitHub Pages, bagikan URL ke pelanggan
+- [ ] (Opsional) Aktifkan custom domain jika punya

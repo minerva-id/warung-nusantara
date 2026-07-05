@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Konfirmasi Pembayaran — Warung Nusantara</title>
+<meta name="description" content="Upload bukti transfer pembayaran pesanan Warung Nusantara. Bayar via Bank Indonesia (BCA, BRI, Mandiri) atau QRIS.">
+<meta name="theme-color" content="#1a0a00">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/konfirmasi-bayar.css">
+<!-- Supabase JS Client (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div class="stage pay-stage">
+
+  <!-- ============ HEADER ============ -->
+  <header class="site-header" style="position:sticky;top:0;z-index:100;">
+    <div class="header-row">
+      <div class="brand">
+        <a href="index.html" class="back-link" aria-label="Kembali ke toko">←</a>
+        <div class="brand-mark">🍚</div>
+        <div class="brand-text">
+          <strong>Warung Nusantara</strong>
+          <span>Konfirmasi Pembayaran</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ HERO KECIL ============ -->
+  <div class="pay-hero">
+    <div class="pay-hero-icon">📤</div>
+    <h1>Upload Bukti Pembayaran</h1>
+    <p>Isi form di bawah setelah Anda melakukan transfer. Admin akan memverifikasi dan memproses pesanan Anda.</p>
+  </div>
+
+  <!-- ============ FORM KONFIRMASI ============ -->
+  <section id="payFormSection" class="section pay-form-section">
+
+    <!-- Langkah 1: Pilih Metode Pembayaran -->
+    <div class="pay-step-card">
+      <div class="step-label"><span class="step-num">1</span> Pilih Metode Pembayaran</div>
+      <div id="payMethodsList" class="pay-methods-grid">
+        <!-- diisi JS -->
+      </div>
+      <input type="hidden" id="payMetodeBayar" name="metodeBayar" required>
+    </div>
+
+    <!-- Info Rekening (dinamis sesuai metode dipilih) -->
+    <div id="bankInfoBox" class="bank-info-box">
+      <!-- diisi JS -->
+    </div>
+
+    <!-- Langkah 2: Isi Detail Transfer -->
+    <div class="pay-step-card">
+      <div class="step-label"><span class="step-num">2</span> Isi Detail Transfer</div>
+      <form id="payConfirmForm">
+        <div class="field">
+          <label for="payOrderNumber">Nomor Pesanan <span class="required">*</span></label>
+          <input
+            type="text"
+            id="payOrderNumber"
+            name="orderNumber"
+            required
+            placeholder="Contoh: WN-20240705-A1B2"
+            style="font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.05em;"
+          >
+          <small class="field-hint">Nomor pesanan dikirim di WhatsApp setelah checkout. Cek juga di chat WhatsApp admin.</small>
+        </div>
+
+        <div class="field">
+          <label for="payNamaPengirim">Nama Pengirim Transfer <span class="required">*</span></label>
+          <input type="text" id="payNamaPengirim" name="namaPengirim" required placeholder="Nama sesuai rekening / akun yang dipakai transfer">
+        </div>
+
+        <div class="field">
+          <label for="payJumlahTransfer">Jumlah Transfer (Rp) <span class="required">*</span></label>
+          <input
+            type="text"
+            id="payJumlahTransfer"
+            name="jumlahTransfer"
+            required
+            inputmode="numeric"
+            placeholder="Contoh: 150000"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+          >
+        </div>
+
+        <div class="field">
+          <label for="payTanggal">Tanggal Transfer <span class="required">*</span></label>
+          <input type="date" id="payTanggal" name="tanggal" required>
+        </div>
+
+        <div class="field">
+          <label for="payCatatan">Catatan (opsional)</label>
+          <textarea id="payCatatan" name="catatan" placeholder="Misal: transfer dari DANA ke BCA, dll."></textarea>
+        </div>
+
+        <!-- Langkah 3: Upload Bukti -->
+        <div class="step-label" style="margin-top:16px;margin-bottom:12px;"><span class="step-num">3</span> Upload Foto Bukti Transfer</div>
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">📷</div>
+          <div class="upload-text">Foto struk transfer / screenshot</div>
+          <div class="upload-hint">JPG, PNG, atau PDF. Maks 5MB. <em>(disarankan tapi opsional)</em></div>
+          <input type="file" id="payBuktiFile" name="buktiFile" accept="image/*,application/pdf" style="display:none;">
+          <button type="button" class="btn-outline" onclick="document.getElementById('payBuktiFile').click()" style="margin-top:12px;">
+            Pilih File
+          </button>
+        </div>
+        <div id="filePreviewWrap" class="file-preview hidden">
+          <img id="filePreviewImg" src="" alt="Preview bukti bayar">
+          <span class="file-preview-label">✓ File terpilih</span>
+        </div>
+
+        <button type="submit" class="btn-primary" style="margin-top:20px;width:100%;">
+          📤 Kirim Konfirmasi Pembayaran
+        </button>
+
+        <p class="form-note" style="margin-top:10px;text-align:center;">
+          Konfirmasi akan disimpan dan diverifikasi admin dalam 1x24 jam.
+        </p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ SUKSES ============ -->
+  <section id="paySuccessSection" class="section pay-success-section hidden">
+    <div class="success-card">
+      <div class="success-icon">✅</div>
+      <h2>Konfirmasi Terkirim!</h2>
+      <p>Nomor pesanan <strong id="successOrderNumber"></strong> sedang dalam verifikasi oleh admin.</p>
+      <p style="font-size:13px;color:var(--muted);margin-top:8px;">
+        Admin akan memproses dan menghubungi Anda via WhatsApp setelah pembayaran terverifikasi.
+        Biasanya kurang dari 1x24 jam.
+      </p>
+      <a href="index.html" class="btn-primary" style="text-decoration:none;display:block;text-align:center;margin-top:20px;">
+        🛒 Kembali Belanja
+      </a>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER MINI ============ -->
+  <footer style="text-align:center;padding:20px 16px;font-size:12px;color:var(--muted);">
+    © <span id="payYear"></span> Warung Nusantara &nbsp;·&nbsp;
+    <a href="index.html" style="color:var(--muted);">Kembali ke Toko</a>
+  </footer>
+
+  <div class="toast" id="payToast"></div>
+
+</div>
+
+<script src="js/supabase-config.js"></script>
+<script src="js/konfirmasi-bayar.js"></script>
+<script>document.getElementById("payYear").textContent = new Date().getFullYear();</script>
+</body>
+</html>

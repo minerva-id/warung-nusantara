@@ -1,46 +1,255 @@
-/* Tambahan gaya khusus halaman admin — memakai variabel dari style.css */
+/* =========================================================
+   WARUNG NUSANTARA — ADMIN.CSS
+   Gaya khusus halaman admin — memakai variabel dari style.css
+   ========================================================= */
 
-.admin-stage{ max-width:900px; margin:0 auto; padding:20px 16px 60px; }
-.admin-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
-.admin-header h1{ font-size:22px; }
-.admin-header a{ font-size:12.5px; color:var(--primary); font-weight:700; text-decoration:none; }
+/* ── Layout ── */
+.admin-stage {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border, var(--line));
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.admin-header h1 { font-size: 20px; margin: 0; }
 
-.lock-screen{
-  max-width:360px; margin:80px auto; background:var(--surface);
-  border:1px solid var(--line); border-radius:var(--radius-l); padding:26px; text-align:center;
+/* ── Lock screen ── */
+.lock-screen {
+  max-width: 380px;
+  margin: 80px auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  padding: 32px 26px;
+  text-align: center;
 }
-.lock-screen .icon{ font-size:34px; margin-bottom:10px; }
-.lock-screen input{
-  width:100%; margin:14px 0; padding:11px 14px; border-radius:var(--radius-s);
-  border:1.5px solid var(--line); font-size:14px; text-align:center;
+.lock-screen .icon { font-size: 38px; margin-bottom: 12px; }
+.lock-screen input {
+  width: 100%;
+  margin: 10px 0;
+  padding: 11px 14px;
+  border-radius: var(--radius-s);
+  border: 1.5px solid var(--line);
+  font-size: 14px;
+  box-sizing: border-box;
 }
-.lock-note{ font-size:11.5px; color:var(--muted); margin-top:12px; line-height:1.5; }
+.lock-screen .field { text-align: left; }
+.lock-screen .field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.lock-note { font-size: 11.5px; color: var(--muted); margin-top: 14px; line-height: 1.55; }
 
-.admin-card{
-  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
-  padding:16px; margin-bottom:18px;
+/* ── Tab navigation ── */
+.admin-tabs {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 2px solid var(--border, var(--line));
+  background: var(--surface);
+  scrollbar-width: none;
 }
-.admin-card h2{ font-size:16px; margin-bottom:12px; }
-.admin-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
-.btn-outline{
-  border:1.5px solid var(--primary); color:var(--primary); background:#fff;
-  padding:9px 14px; border-radius:var(--radius-s); font-weight:700; font-size:13px; cursor:pointer;
-}
-.btn-outline.green{ border-color:var(--accent-green); color:var(--accent-green-d); }
-.btn-solid{
-  border:none; background:var(--primary); color:#fff;
-  padding:9px 16px; border-radius:var(--radius-s); font-weight:700; font-size:13px; cursor:pointer;
-}
-.grid-form{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
-.grid-form .full{ grid-column:1 / -1; }
-@media (max-width:560px){ .grid-form{ grid-template-columns:1fr; } }
+.admin-tabs::-webkit-scrollbar { display: none; }
 
-.admin-table{ width:100%; border-collapse:collapse; font-size:13px; }
-.admin-table th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:8px 6px; border-bottom:1px solid var(--line); }
-.admin-table td{ padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle; }
-.admin-table input, .admin-table select{
-  width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:12.5px; background:var(--bg);
+.admin-tab-btn {
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.15s;
 }
-.row-delete{ background:none; border:none; color:var(--primary); cursor:pointer; font-size:13px; font-weight:700; }
-.table-wrap{ overflow-x:auto; }
-.status-line{ font-size:12.5px; color:var(--accent-green-d); margin-top:8px; min-height:16px; }
+.admin-tab-btn:hover { color: var(--on-surface); }
+.admin-tab-btn.active {
+  color: var(--primary, #c84b11);
+  border-bottom-color: var(--primary, #c84b11);
+}
+
+/* ── Tab panels ── */
+.admin-tab-panel {
+  padding: 20px 16px;
+}
+
+/* ── Admin cards ── */
+.admin-card {
+  background: var(--surface);
+  border: 1px solid var(--border, var(--line));
+  border-radius: var(--radius-m);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.admin-card h2 { font-size: 16px; margin-bottom: 12px; }
+.admin-card h3 { font-size: 15px; margin-bottom: 12px; }
+
+/* ── Actions row ── */
+.admin-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+
+/* ── Buttons ── */
+.btn-outline {
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
+  background: transparent;
+  padding: 9px 14px;
+  border-radius: var(--radius-s);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-outline:hover { background: rgba(200,75,17,0.08); }
+.btn-outline.green {
+  border-color: var(--accent-green, #22c55e);
+  color: var(--accent-green-d, #16a34a);
+}
+.btn-outline.green:hover { background: rgba(34,197,94,0.1); }
+.btn-solid {
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  padding: 9px 16px;
+  border-radius: var(--radius-s);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-solid:hover { opacity: 0.9; }
+
+/* ── Form grid ── */
+.grid-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.grid-form .full { grid-column: 1 / -1; }
+@media (max-width: 560px) { .grid-form { grid-template-columns: 1fr; } }
+
+/* ── Tabel produk ── */
+.admin-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.admin-table th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border, var(--line));
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border, var(--line));
+  vertical-align: middle;
+}
+.admin-table input, .admin-table select {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--border, var(--line));
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--on-surface);
+}
+.admin-table input[type="checkbox"] { width: auto; }
+
+.row-delete {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 2px;
+  transition: transform 0.15s;
+}
+.row-delete:hover { transform: scale(1.2); }
+.row-save {
+  background: none;
+  border: 1px solid var(--accent-green, #22c55e);
+  color: var(--accent-green-d, #16a34a);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.row-save:hover { background: rgba(34,197,94,0.1); }
+.row-inactive td { opacity: 0.5; }
+
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Status bar ── */
+.status-line {
+  font-size: 12.5px;
+  min-height: 18px;
+  margin-bottom: 8px;
+  padding: 6px 16px;
+}
+.status-ok { color: var(--accent-green-d, #16a34a); }
+.status-error { color: #ef4444; }
+.status-info { color: var(--muted); }
+
+/* ── Status messages (in tab panels) ── */
+.status-msg {
+  font-size: 13px;
+  padding: 16px;
+  border-radius: 10px;
+  margin: 0;
+}
+.status-msg.info {
+  background: rgba(99,102,241,0.08);
+  color: #6366f1;
+}
+.status-msg.error {
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
+}
+
+/* ── Status badges (pesanan, pembayaran) ── */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: capitalize;
+}
+
+/* ── Settings form ── */
+#settingsForm .field { margin-bottom: 12px; }
+#settingsForm input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border, var(--line));
+  border-radius: var(--radius-s);
+  font-size: 13.5px;
+  background: var(--bg);
+  color: var(--on-surface);
+  box-sizing: border-box;
+}
+
+/* ── User email di header ── */
+#adminUserEmail {
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  background: rgba(200,75,17,0.08);
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--primary, #c84b11);
+}
