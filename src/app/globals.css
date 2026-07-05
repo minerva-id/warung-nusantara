@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+@layer base {
+  :root {
+    --background: #FBF8F2; /* putih beras hangat */
+    --foreground: #2B2119; /* cokelat kopi */
+    --card: #FFFFFF;
+    --card-foreground: #2B2119;
+    --popover: #FFFFFF;
+    --popover-foreground: #2B2119;
+    --primary: #C1272D; /* merah cabai */
+    --primary-foreground: #FFFFFF;
+    --secondary: #E8A93B; /* kuning kunyit */
+    --secondary-foreground: #2B2119;
+    --muted: #FBE7E4; /* primary tint */
+    --muted-foreground: #8A7B68; /* taupe hangat */
+    --accent: #4F7942; /* hijau daun pisang */
+    --accent-foreground: #FFFFFF;
+    --destructive: #96181D; /* merah gelap */
+    --destructive-foreground: #FFFFFF;
+    --border: #E6DCC6; /* garis pemisah krem */
+    --input: #E6DCC6;
+    --ring: #C1272D;
+    --radius: 14px;
+  }
+
+  .dark {
+    /* Keep a simpler dark mode based on the warm theme or just use inverse */
+    --background: #1c1917;
+    --foreground: #FBF8F2;
+    --card: #292524;
+    --card-foreground: #FBF8F2;
+    --popover: #292524;
+    --popover-foreground: #FBF8F2;
+    --primary: #C1272D;
+    --primary-foreground: #ffffff;
+    --secondary: #E8A93B;
+    --secondary-foreground: #1c1917;
+    --muted: #44403c;
+    --muted-foreground: #d6d3d1;
+    --accent: #4F7942;
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #44403c;
+    --input: #44403c;
+    --ring: #C1272D;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
+    font-family: var(--font-sans), system-ui, sans-serif;
+  }
+  
+  /* Hide scrollbar for clean design but keep functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
