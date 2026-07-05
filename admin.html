@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Katalog — Warung Nusantara</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<!-- ============ GERBANG KATA SANDI (proteksi ringan, lihat DOCUMENTATION.md) ============ -->
+<div class="lock-screen" id="lockScreen">
+  <div class="icon">🔐</div>
+  <h2>Masuk Admin</h2>
+  <p style="font-size:13px;color:var(--muted);">Halaman ini untuk mengelola katalog produk &amp; harga.</p>
+  <input type="password" id="lockPassword" placeholder="Masukkan kata sandi admin">
+  <button class="btn-solid" style="width:100%;" id="btnUnlock">Masuk</button>
+  <p class="lock-note">⚠️ Ini hanya proteksi ringan di sisi browser, bukan keamanan sungguhan. Jangan gunakan kata sandi penting, dan baca DOCUMENTATION.md bagian "Batasan Teknis" sebelum go-live.</p>
+</div>
+
+<!-- ============ HALAMAN ADMIN ============ -->
+<div class="admin-stage hidden" id="adminStage">
+  <div class="admin-header">
+    <h1>🧾 Admin Katalog</h1>
+    <a href="index.html">← Kembali ke Toko</a>
+  </div>
+
+  <div class="admin-card">
+    <h2>1. Muat Data Produk</h2>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+      Muat otomatis dari <code>data/products.json</code>, atau impor file JSON hasil unduhan sebelumnya.
+    </p>
+    <div class="admin-actions">
+      <button class="btn-outline" id="btnLoadDefault">Muat dari data/products.json</button>
+      <button class="btn-outline" id="btnImportFile">Impor File JSON</button>
+      <input type="file" id="fileInput" accept="application/json" class="hidden">
+    </div>
+    <div class="status-line" id="loadStatus"></div>
+  </div>
+
+  <div class="admin-card">
+    <h2>2. Tambah Produk Baru</h2>
+    <form id="addForm" class="grid-form">
+      <div class="field"><label>Nama Produk</label><input type="text" id="fNama" required></div>
+      <div class="field">
+        <label>Kategori</label>
+        <select id="fKategori" required>
+          <option value="mie-instan">Mie Instan</option>
+          <option value="bumbu-dapur">Bumbu Dapur</option>
+          <option value="sembako">Sembako</option>
+          <option value="snack">Snack</option>
+          <option value="minuman">Minuman</option>
+          <option value="bahan-segar">Bahan Segar</option>
+        </select>
+      </div>
+      <div class="field"><label>Harga (¥)</label><input type="number" id="fHarga" min="0" required></div>
+      <div class="field"><label>Satuan</label><input type="text" id="fSatuan" placeholder="Contoh: pak isi 5" required></div>
+      <div class="field"><label>Stok</label><input type="number" id="fStok" min="0" required></div>
+      <div class="field"><label>Emoji Ikon</label><input type="text" id="fEmoji" placeholder="🍜" maxlength="4"></div>
+      <div class="field full"><label>Deskripsi</label><input type="text" id="fDeskripsi" placeholder="Deskripsi singkat produk"></div>
+      <div class="field"><label>Tag (pisahkan koma)</label><input type="text" id="fTag" placeholder="halal, pedas, favorit"></div>
+      <div class="field" style="display:flex;align-items:center;gap:8px;margin-top:22px;">
+        <input type="checkbox" id="fUnggulan" style="width:auto;"> <label style="margin:0;" for="fUnggulan">Tandai sebagai produk favorit</label>
+      </div>
+      <div class="full">
+        <button type="submit" class="btn-solid">+ Tambah ke Tabel</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <h2>3. Daftar Produk &amp; Atur Harga</h2>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+      Ubah langsung nilai di tabel (nama, harga, stok, dst). Perubahan tersimpan otomatis ke memori — jangan lupa unduh file di langkah 4.
+    </p>
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Nama</th><th>Kategori</th><th>Harga (¥)</th><th>Satuan</th><th>Stok</th><th>Emoji</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="productTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <h2>4. Simpan Perubahan</h2>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+      Unduh file <code>products.json</code> yang sudah diperbarui, lalu ganti file lama di folder <code>data/</code> pada repository GitHub (lihat DOCUMENTATION.md langkah "Menambah &amp; Mengubah Produk").
+    </p>
+    <div class="admin-actions">
+      <button class="btn-outline green" id="btnDownload">⬇ Unduh products.json</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+</body>
+</html>
