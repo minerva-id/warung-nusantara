@@ -16,6 +16,10 @@ export default function ProductsTab() {
   const [stok, setStok] = useState('')
   const [kategori, setKategori] = useState('makanan')
   const [deskripsi, setDeskripsi] = useState('')
+  const [gambarUrl, setGambarUrl] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
   
   const supabase = createClient()
 
@@ -47,6 +51,9 @@ export default function ProductsTab() {
     setStok('10')
     setKategori('makanan')
     setDeskripsi('')
+    setGambarUrl('')
+    setFile(null)
+    setPreviewUrl(null)
     setIsModalOpen(true)
   }
 
@@ -56,25 +63,64 @@ export default function ProductsTab() {
     fetchProducts()
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0]
+      setFile(selectedFile)
+      setPreviewUrl(URL.createObjectURL(selectedFile))
+    }
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      nama,
-      harga: parseInt(harga),
-      stok: parseInt(stok),
-      kategori,
-      deskripsi,
-      aktif: true
-    }
+    setIsUploading(true)
 
-    if (editingId) {
-      await supabase.from('products').update(payload).eq('id', editingId)
-    } else {
-      await supabase.from('products').insert([payload])
+    try {
+      let finalImageUrl = gambarUrl
+
+      // Upload file to Supabase Storage if a new file is selected
+      if (file) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `produk-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+        const filePath = `${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('products')
+          .upload(filePath, file)
+
+        if (!uploadError) {
+          const { data } = supabase.storage.from('products').getPublicUrl(filePath)
+          finalImageUrl = data.publicUrl
+        } else {
+          console.error("Upload error:", uploadError)
+          alert("Gagal mengupload gambar, pastikan bucket 'products' sudah dibuat dan public di Supabase.")
+        }
+      }
+
+      const payload = {
+        nama,
+        harga: parseInt(harga),
+        stok: parseInt(stok),
+        kategori,
+        deskripsi,
+        gambar_url: finalImageUrl,
+        aktif: true
+      }
+
+      if (editingId) {
+        await supabase.from('products').update(payload).eq('id', editingId)
+      } else {
+        await supabase.from('products').insert([payload])
+      }
+      
+      setIsModalOpen(false)
+      fetchProducts()
+    } catch (err) {
+      console.error(err)
+      alert("Terjadi kesalahan saat menyimpan produk")
+    } finally {
+      setIsUploading(false)
     }
-    
-    setIsModalOpen(false)
-    fetchProducts()
   }
 
   return (
@@ -111,20 +157,35 @@ export default function ProductsTab() {
                   <input type="number" value={stok} onChange={e => setStok(e.target.value)} required className="w-full border border-gray-200 rounded-lg p-2 outline-none focus:border-primary" />
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500 block mb-1">Kategori</label>
-                <select value={kategori} onChange={e => setKategori(e.target.value)} className="w-full border border-gray-200 rounded-lg p-2 outline-none focus:border-primary bg-white">
-                  <option value="makanan">Makanan</option>
-                  <option value="minuman">Minuman</option>
-                  <option value="bumbu">Bumbu</option>
-                  <option value="lainnya">Lainnya</option>
-                </select>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-xs font-semibold text-gray-500 block mb-1">Kategori</label>
+                  <select value={kategori} onChange={e => setKategori(e.target.value)} className="w-full border border-gray-200 rounded-lg p-2 outline-none focus:border-primary bg-white">
+                    <option value="makanan">Makanan</option>
+                    <option value="minuman">Minuman</option>
+                    <option value="bumbu">Bumbu</option>
+                    <option value="lainnya">Lainnya</option>
+                  </select>
+                </div>
               </div>
+              
+              <div>
+                <label className="text-xs font-semibold text-gray-500 block mb-1">Foto Produk</label>
+                <div className="flex items-center gap-4">
+                  {(previewUrl || gambarUrl) && (
+                    <img src={previewUrl || gambarUrl} className="w-16 h-16 rounded-lg object-cover border border-gray-200" />
+                  )}
+                  <input type="file" accept="image/*" onChange={handleFileChange} className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-semibold text-gray-500 block mb-1">Deskripsi</label>
                 <textarea value={deskripsi} onChange={e => setDeskripsi(e.target.value)} className="w-full border border-gray-200 rounded-lg p-2 outline-none focus:border-primary min-h-[80px]" />
               </div>
-              <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-xl mt-2">Simpan Produk</button>
+              <button type="submit" disabled={isUploading} className="w-full bg-primary text-white font-bold py-3 rounded-xl mt-2 disabled:opacity-50">
+                {isUploading ? 'Menyimpan...' : 'Simpan Produk'}
+              </button>
             </form>
           </div>
         </div>
